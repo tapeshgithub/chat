@@ -65,10 +65,13 @@ public class SecurityConfig {
 				.successHandler((req,res,auth)->res.setStatus(200))
 				.failureHandler((req,res,ex) -> res.setStatus(401))
 				)
-		.logout(logout->logout
-				.logoutSuccessUrl("/api/auth/logout")
-				.logoutSuccessHandler((req,res,auth)->res.setStatus(200))
-				);
+		.logout(logout -> logout
+		        .logoutUrl("/api/auth/logout")         
+		        .invalidateHttpSession(true)
+		        .deleteCookies("JSESSIONID")
+		        .logoutSuccessHandler((req, res, auth) -> res.setStatus(200))
+		        .permitAll()
+		        );
 		return http.build();
 	}
 }
