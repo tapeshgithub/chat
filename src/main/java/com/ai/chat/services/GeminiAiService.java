@@ -55,15 +55,19 @@ public class GeminiAiService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
+
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-        ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
-
-        List candidates = (List) response.getBody().get("candidates");
-        Map firstCandidate = (Map) candidates.get(0);
-        Map content = (Map) firstCandidate.get("content");
-        List parts = (List) content.get("parts");
-        Map firstPart = (Map) parts.get(0);
-
-        return firstPart.get("text").toString();
-    }
+        try {
+            ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
+            List candidates = (List) response.getBody().get("candidates");
+            Map firstCandidate = (Map) candidates.get(0);
+            Map content = (Map) firstCandidate.get("content");
+            List parts = (List) content.get("parts");
+            Map firstPart = (Map) parts.get(0);
+            return firstPart.get("text").toString();
+        } catch (Exception e) {
+            System.err.println("Gemini API error: " + e.getMessage());
+            throw new RuntimeException("Failed to get response from Gemini: " + e.getMessage());
+        }
+       }
 }

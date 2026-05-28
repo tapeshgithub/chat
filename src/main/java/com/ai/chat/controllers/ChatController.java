@@ -31,23 +31,25 @@ public class ChatController {
 	
 	@PostMapping("/response")
 	public ChatResponse chat(@RequestBody ChatRequest request, Principal principal) {
-		AppUser user = user_repo.findByUsername(principal.getName()).orElseThrow();
-		
-		List<ChatMessage> history = chatrepo.findByUserOrderByCreatedAtAsc(user);
-		ChatMessage userMsg = new ChatMessage();
-		userMsg.setRole("user");
-		userMsg.setContent(request.getMessage());
-		userMsg.setUser(user);
-		chatrepo.save(userMsg);
-		
-		String ai_reply = geminiAiService.askGemini(history, request.getMessage());
-		ChatMessage aiMsg = new ChatMessage();
-		aiMsg.setRole("assistant");
-		aiMsg.setContent(ai_reply);
-		aiMsg.setUser(user);
-		chatrepo.save(aiMsg);
-		
-		return new ChatResponse(ai_reply);
+	    AppUser user = user_repo.findByUsername(principal.getName()).orElseThrow();
+
+	    List<ChatMessage> history = chatrepo.findByUserOrderByCreatedAtAsc(user);
+
+	    String ai_reply = geminiAiService.askGemini(history, request.getMessage());
+
+	    ChatMessage userMsg = new ChatMessage();
+	    userMsg.setRole("user");
+	    userMsg.setContent(request.getMessage());
+	    userMsg.setUser(user);
+	    chatrepo.save(userMsg);
+
+	    ChatMessage aiMsg = new ChatMessage();
+	    aiMsg.setRole("assistant");
+	    aiMsg.setContent(ai_reply);
+	    aiMsg.setUser(user);
+	    chatrepo.save(aiMsg);
+
+	    return new ChatResponse(ai_reply);
 	}
 	
 	@GetMapping("/history")
