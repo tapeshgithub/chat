@@ -11,6 +11,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import com.ai.chat.models.ChatMessage;
@@ -33,7 +34,6 @@ public class GeminiAiService {
         List<Map<String, Object>> contents = new ArrayList<>();
 
         for (ChatMessage msg : history) {
-            // Gemini uses "model" instead of "assistant"
             String role = msg.getRole().equals("assistant") ? "model" : "user";
             contents.add(Map.of(
                     "role", role,
@@ -54,20 +54,41 @@ public class GeminiAiService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-
-
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+
         try {
             ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
+
+            System.out.println("Gemini raw response: " + response.getBody());
+
             List candidates = (List) response.getBody().get("candidates");
+            if (candidates == null || candidates.isEmpty()) {
+                throw new RuntimeException("Gemini returned no candidates. Response: " + response.getBody());
+            }
+
             Map firstCandidate = (Map) candidates.get(0);
+            String finishReason = (String) firstCandidate.get("finishReason");
             Map content = (Map) firstCandidate.get("content");
+
+            if (content == null) {
+                System.err.println("Gemini blocked response. finishReason: " + finishReason);
+                return "I'm sorry, I couldn't generate a response for that. Please try rephrasing.";
+            }
+
             List parts = (List) content.get("parts");
+            if (parts == null || parts.isEmpty()) {
+                return "I'm sorry, I received an empty response. Please try again.";
+            }
+
             Map firstPart = (Map) parts.get(0);
             return firstPart.get("text").toString();
+
+        } catch (HttpClientErrorException e) {
+            System.err.println("Gemini HTTP error: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
+            throw new RuntimeException("Gemini API rejected the request: " + e.getResponseBodyAsString());
         } catch (Exception e) {
-            System.err.println("Gemini API error: " + e.getMessage());
-            throw new RuntimeException("Failed to get response from Gemini: " + e.getMessage());
+            System.err.println("Gemini call failed: " + e.getMessage());
+            throw new RuntimeException("Failed to reach Gemini API: " + e.getMessage());
         }
-       }
+    }
 }
