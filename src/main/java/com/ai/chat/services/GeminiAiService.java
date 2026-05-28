@@ -33,21 +33,26 @@ public class GeminiAiService {
 
         List<Map<String, Object>> contents = new ArrayList<>();
 
-        // Sanitize: Gemini requires strictly alternating user/model turns
+        // Sanitize: Gemini requires strictly alternating user -> model turns
         List<ChatMessage> sanitized = new ArrayList<>();
         String expectedRole = "user";
         for (ChatMessage msg : history) {
-            String msgRole = msg.getRole().equals("assistant") ? "model" : "user";
-            if (msgRole.equals(expectedRole)) {
+            String geminiRole = msg.getRole().equals("assistant") ? "model" : "user";
+            if (geminiRole.equals(expectedRole)) {
                 sanitized.add(msg);
-                expectedRole = expectedRole.equals("user") ? "model" : "user";
+                expectedRole = geminiRole.equals("user") ? "model" : "user";
             }
         }
         // Drop trailing user message (incomplete pair)
-        if (!sanitized.isEmpty() && sanitized.get(sanitized.size() - 1).getRole().equals("user")) {
-            sanitized.remove(sanitized.size() - 1);
+        if (!sanitized.isEmpty()) {
+            ChatMessage last = sanitized.get(sanitized.size() - 1);
+            String lastGeminiRole = last.getRole().equals("assistant") ? "model" : "user";
+            if (lastGeminiRole.equals("user")) {
+                sanitized.remove(sanitized.size() - 1);
+            }
         }
 
+        // Build contents from sanitized history
         for (ChatMessage msg : sanitized) {
             String role = msg.getRole().equals("assistant") ? "model" : "user";
             contents.add(Map.of(
@@ -55,6 +60,7 @@ public class GeminiAiService {
                     "parts", List.of(Map.of("text", msg.getContent()))));
         }
 
+        // Add current user message
         contents.add(Map.of(
                 "role", "user",
                 "parts", List.of(Map.of("text", userMessage))));
@@ -78,7 +84,8 @@ public class GeminiAiService {
 
             List candidates = (List) response.getBody().get("candidates");
             if (candidates == null || candidates.isEmpty()) {
-                throw new RuntimeException("Gemini returned no candidates. Response: " + response.getBody());
+                System.err.println("No candidates. Full response: " + response.getBody());
+                return "I'm sorry, I couldn't get a response. Please try again.";
             }
 
             Map firstCandidate = (Map) candidates.get(0);
@@ -86,7 +93,7 @@ public class GeminiAiService {
             Map content = (Map) firstCandidate.get("content");
 
             if (content == null) {
-                System.err.println("Gemini blocked response. finishReason: " + finishReason);
+                System.err.println("Gemini blocked. finishReason: " + finishReason);
                 return "I'm sorry, I couldn't generate a response for that. Please try rephrasing.";
             }
 
@@ -100,6 +107,9 @@ public class GeminiAiService {
 
         } catch (HttpClientErrorException e) {
             System.err.println("Gemini HTTP error: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
+            if (e.getStatusCode().value() == 429) {
+                return "I'm currently over my usage limit. Please try again in a few minutes.";
+            }
             throw new RuntimeException("Gemini API rejected the request: " + e.getResponseBodyAsString());
         } catch (Exception e) {
             System.err.println("Gemini call failed: " + e.getMessage());

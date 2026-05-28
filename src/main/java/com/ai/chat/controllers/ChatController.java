@@ -2,8 +2,9 @@ package com.ai.chat.controllers;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,45 +22,49 @@ import com.ai.chat.services.GeminiAiService;
 @RestController
 @RequestMapping("/api/chat")
 public class ChatController {
-	@Autowired
-	private ChatRepository chatrepo;
-	
-	@Autowired
-	private UserRepository user_repo;
 
-	@Autowired
-	private GeminiAiService geminiAiService;
-	
-	@PostMapping("/response")
-	public ChatResponse chat(@RequestBody ChatRequest request, Principal principal) {
-	    AppUser user = user_repo.findByUsername(principal.getName()).orElseThrow();
+    @Autowired
+    private ChatRepository chatrepo;
 
-	    List<ChatMessage> history = chatrepo.findByUserOrderByCreatedAtAsc(user);
+    @Autowired
+    private UserRepository user_repo;
 
-	    String ai_reply = geminiAiService.askGemini(history, request.getMessage());
+    @Autowired
+    private GeminiAiService geminiAiService;
 
-	    ChatMessage userMsg = new ChatMessage();
-	    userMsg.setRole("user");
-	    userMsg.setContent(request.getMessage());
-	    userMsg.setUser(user);
-	    chatrepo.save(userMsg);
+    @PostMapping("/response")
+    public ChatResponse chat(@RequestBody ChatRequest request, Principal principal) {
+        AppUser user = user_repo.findByUsername(principal.getName()).orElseThrow();
 
-	    ChatMessage aiMsg = new ChatMessage();
-	    aiMsg.setRole("assistant");
-	    aiMsg.setContent(ai_reply);
-	    aiMsg.setUser(user);
-	    chatrepo.save(aiMsg);
+        // Fetch last 10 DB rows (5 user + 5 AI = 5 conversation pairs)
+        List<ChatMessage> history = chatrepo
+                .findRecentByUser(user, PageRequest.of(0, 10))
+                .stream()
+                .sorted((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt()))
+                .collect(Collectors.toList());
 
-	    return new ChatResponse(ai_reply);
-	}
-	@DeleteMapping("/admin/clear-all")
-	public org.springframework.http.ResponseEntity<String> clearAll() {
-	    chatrepo.deleteAll();
-	    return org.springframework.http.ResponseEntity.ok("All messages cleared successfully");
-	}
-	@GetMapping("/history")
-	public List<ChatMessage> history(Principal principal){
-		AppUser user = user_repo.findByUsername(principal.getName()).orElseThrow();
-		return chatrepo.findByUserOrderByCreatedAtAsc(user);
-	}
+        String ai_reply = geminiAiService.askGemini(history, request.getMessage());
+
+        // Save current user message
+        ChatMessage userMsg = new ChatMessage();
+        userMsg.setRole("user");
+        userMsg.setContent(request.getMessage());
+        userMsg.setUser(user);
+        chatrepo.save(userMsg);
+
+        // Save AI reply
+        ChatMessage aiMsg = new ChatMessage();
+        aiMsg.setRole("assistant");
+        aiMsg.setContent(ai_reply);
+        aiMsg.setUser(user);
+        chatrepo.save(aiMsg);
+
+        return new ChatResponse(ai_reply);
+    }
+
+    @GetMapping("/history")
+    public List<ChatMessage> history(Principal principal) {
+        AppUser user = user_repo.findByUsername(principal.getName()).orElseThrow();
+        return chatrepo.findByUserOrderByCreatedAtAsc(user);
+    }
 }

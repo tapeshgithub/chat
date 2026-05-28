@@ -14,65 +14,63 @@ import com.ai.chat.repository.UserRepository;
 
 @Configuration
 public class SecurityConfig {
-	private final UserRepository user_repo;
-	public SecurityConfig(UserRepository user_repo) {
-		this.user_repo=user_repo;
-	}
-	
-	@Bean
-	public UserDetailsService userDetailsService() {
-		return username -> {
-		AppUser user = user_repo.findByUsername(username)
-				.orElseThrow(() -> new UsernameNotFoundException("User not found"));
-		
-		return org.springframework.security.core.userdetails.User
-				.withUsername(user.getUsername())
-				.password(user.getPassword())
-				.roles("USER")
-				.build();
-		};
-	}
-	
-	@Bean
-	public BCryptPasswordEncoder passwordEncoder() {
-		return new BCryptPasswordEncoder();
-	}
-	
-	@Bean
-	public DaoAuthenticationProvider authenticationProvider() {
-		DaoAuthenticationProvider provider= new DaoAuthenticationProvider(userDetailsService());
-		//provider.setUserDetailsPasswordService(userDetailsService());
-		provider.setPasswordEncoder(passwordEncoder());
-		return provider;
-	}
-	
-	@Bean
-	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception{
-		http
-		.csrf(csrf->csrf.disable())
-		.cors(cors->{})
-		.authorizeHttpRequests(auth->auth
-				.requestMatchers(
-						"/api/auth/register",
-						"/api/auth/login",
-						"/api/auth/me",
-						"/api/chat/admin/clear-all"
-						).permitAll()
-				.anyRequest()
-				.authenticated()
-				)
-		.formLogin(form->form
-				.loginProcessingUrl("/api/auth/login")
-				.successHandler((req,res,auth)->res.setStatus(200))
-				.failureHandler((req,res,ex) -> res.setStatus(401))
-				)
-		.logout(logout -> logout
-		        .logoutUrl("/api/auth/logout")         
-		        .invalidateHttpSession(true)
-		        .deleteCookies("JSESSIONID")
-		        .logoutSuccessHandler((req, res, auth) -> res.setStatus(200))
-		        .permitAll()
-		        );
-		return http.build();
-	}
+
+    private final UserRepository user_repo;
+
+    public SecurityConfig(UserRepository user_repo) {
+        this.user_repo = user_repo;
+    }
+
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return username -> {
+            AppUser user = user_repo.findByUsername(username)
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+            return org.springframework.security.core.userdetails.User
+                    .withUsername(user.getUsername())
+                    .password(user.getPassword())
+                    .roles("USER")
+                    .build();
+        };
+    }
+
+    @Bean
+    public BCryptPasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public DaoAuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService());
+        provider.setPasswordEncoder(passwordEncoder());
+        return provider;
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable())
+            .cors(cors -> {})
+            .authorizeHttpRequests(auth -> auth
+                    .requestMatchers(
+                            "/api/auth/register",
+                            "/api/auth/login",
+                            "/api/auth/me"
+                    ).permitAll()
+                    .anyRequest().authenticated()
+            )
+            .formLogin(form -> form
+                    .loginProcessingUrl("/api/auth/login")
+                    .successHandler((req, res, auth) -> res.setStatus(200))
+                    .failureHandler((req, res, ex) -> res.setStatus(401))
+            )
+            .logout(logout -> logout
+                    .logoutUrl("/api/auth/logout")
+                    .invalidateHttpSession(true)
+                    .deleteCookies("JSESSIONID")
+                    .logoutSuccessHandler((req, res, auth) -> res.setStatus(200))
+                    .permitAll()
+            );
+        return http.build();
+    }
 }
