@@ -36,23 +36,16 @@ public class ChatController {
     public ChatResponse chat(@RequestBody ChatRequest request, Principal principal) {
         AppUser user = user_repo.findByUsername(principal.getName()).orElseThrow();
 
-        // Fetch last 10 DB rows (5 user + 5 AI = 5 conversation pairs)
-        List<ChatMessage> history = chatrepo
-                .findRecentByUser(user, PageRequest.of(0, 10))
-                .stream()
-                .sorted((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt()))
-                .collect(Collectors.toList());
+        List<ChatMessage> history = new java.util.ArrayList<>();
 
         String ai_reply = geminiAiService.askGemini(history, request.getMessage());
 
-        // Save current user message
         ChatMessage userMsg = new ChatMessage();
         userMsg.setRole("user");
         userMsg.setContent(request.getMessage());
         userMsg.setUser(user);
         chatrepo.save(userMsg);
 
-        // Save AI reply
         ChatMessage aiMsg = new ChatMessage();
         aiMsg.setRole("assistant");
         aiMsg.setContent(ai_reply);
