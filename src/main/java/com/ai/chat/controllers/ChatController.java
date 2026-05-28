@@ -3,6 +3,7 @@ package com.ai.chat.controllers;
 import java.security.Principal;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -51,7 +52,11 @@ public class ChatController {
 
 	    return new ChatResponse(ai_reply);
 	}
-	
+	@DeleteMapping("/admin/clear-all")
+	public org.springframework.http.ResponseEntity<String> clearAll() {
+	    chatrepo.deleteAll();
+	    return org.springframework.http.ResponseEntity.ok("All messages cleared successfully");
+	}
 	@GetMapping("/history")
 	public List<ChatMessage> history(Principal principal){
 		AppUser user = user_repo.findByUsername(principal.getName()).orElseThrow();
