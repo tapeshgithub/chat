@@ -33,7 +33,22 @@ public class GeminiAiService {
 
         List<Map<String, Object>> contents = new ArrayList<>();
 
+        // Sanitize: Gemini requires strictly alternating user/model turns
+        List<ChatMessage> sanitized = new ArrayList<>();
+        String expectedRole = "user";
         for (ChatMessage msg : history) {
+            String msgRole = msg.getRole().equals("assistant") ? "model" : "user";
+            if (msgRole.equals(expectedRole)) {
+                sanitized.add(msg);
+                expectedRole = expectedRole.equals("user") ? "model" : "user";
+            }
+        }
+        // Drop trailing user message (incomplete pair)
+        if (!sanitized.isEmpty() && sanitized.get(sanitized.size() - 1).getRole().equals("user")) {
+            sanitized.remove(sanitized.size() - 1);
+        }
+
+        for (ChatMessage msg : sanitized) {
             String role = msg.getRole().equals("assistant") ? "model" : "user";
             contents.add(Map.of(
                     "role", role,
