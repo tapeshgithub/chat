@@ -60,4 +60,10 @@ public class ChatController {
         AppUser user = user_repo.findByUsername(principal.getName()).orElseThrow();
         return chatrepo.findByUserOrderByCreatedAtAsc(user);
     }
+    
+    @GetMapping("/admin/clear-all")
+    public String clearAll() {
+        chatrepo.deleteAll();
+        return "Cleared";
+    }
 }
